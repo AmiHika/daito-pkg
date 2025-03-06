@@ -188,101 +188,113 @@ function doGet(e) {
 }
 
 /**
- * スプレッドシートのロックを取得してからアクセス情報を記録する
- * 書き込みの競合を防止する
+ * スプレッドシートにアクセス情報を記録する（シンプル化した実装）
  * @param {string} targetURL - リダイレクト先のURL
  * @return {Object} 処理結果の詳細情報
  */
 function recordAccessWithLock(targetURL) {
   const result = {
     success: false,
-    sheetExists: false,
-    sheetName: SHEET_NAME,
-    spreadsheetId: SPREADSHEET_ID,
-    timestamp: new Date().toISOString(),
-    rowsBeforeAppend: 0,
-    rowsAfterAppend: 0,
-    error: null
+    message: "",
+    timestamp: new Date().toISOString()
   };
 
   try {
-    // スプレッドシートIDとシート名をログに記録
-    Logger.log(`スプレッドシートへの記録開始: ID=${SPREADSHEET_ID}, シート名=${SHEET_NAME}`);
+    logToSheet('書き込み処理開始', {
+      targetURL: targetURL,
+      spreadsheetId: SPREADSHEET_ID,
+      sheetName: SHEET_NAME
+    });
 
     // スプレッドシートを開く
     const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
-    result.spreadsheetOpened = true;
-    Logger.log(`スプレッドシートを開きました: ${spreadsheet.getName()}`);
 
-    // シートの存在確認と準備
+    // シートを取得または作成
     let sheet = spreadsheet.getSheetByName(SHEET_NAME);
-
-    // シートが存在しない場合は新規作成
     if (!sheet) {
-      Logger.log(`シート "${SHEET_NAME}" が見つからないため、新規作成します`);
       sheet = spreadsheet.insertSheet(SHEET_NAME);
       // ヘッダー行を追加
       sheet.appendRow(['タイムスタンプ', 'ターゲットURL']);
       sheet.getRange(1, 1, 1, 2).setFontWeight('bold');
       sheet.setFrozenRows(1);
-      result.sheetCreated = true;
-      Logger.log(`シート "${SHEET_NAME}" を作成しました`);
-    } else {
-      result.sheetExists = true;
-      Logger.log(`シート "${SHEET_NAME}" が見つかりました`);
+      logToSheet('シートを新規作成', { sheetName: SHEET_NAME });
     }
 
-    // 現在の行数を記録
-    result.rowsBeforeAppend = sheet.getLastRow();
-    Logger.log(`現在の行数: ${result.rowsBeforeAppend}`);
-
+    // シンプルな直接書き込み方法 - より確実に記録するため
     try {
-      // 現在のタイムスタンプを取得
+      // 方法1: appendRow を使用（一般的な方法）
       const timestamp = new Date();
-
-      // シート名、現在の時刻、URLをログに記録（直接評価用）
-      Logger.log(`直接書き込みテスト - シート: ${sheet.getName()}, 時刻: ${timestamp}, URL: ${targetURL}`);
-
-      // スプレッドシートに新しい行を追加（ロックなしで試行）
       sheet.appendRow([timestamp, targetURL]);
-
-      // 明示的に変更を保存
       SpreadsheetApp.flush();
-      Logger.log('行を追加し、変更を保存しました');
 
-      // 追加後の行数を記録
-      result.rowsAfterAppend = sheet.getLastRow();
-      result.success = (result.rowsAfterAppend > result.rowsBeforeAppend);
+      logToSheet('方法1による書き込み完了', {
+        method: 'appendRow',
+        timestamp: timestamp.toISOString()
+      });
 
-      Logger.log(`追加後の行数: ${result.rowsAfterAppend}, 成功: ${result.success}`);
+      // 成功結果を記録
+      result.success = true;
+      result.message = "アクセスが正常に記録されました";
 
-      // 念のため2回目の書き込みテスト（直接セルに書き込む）
-      const lastRow = sheet.getLastRow() + 1;
-      sheet.getRange(lastRow, 1).setValue(new Date());
-      sheet.getRange(lastRow, 2).setValue(targetURL + " (2回目のテスト)");
-      SpreadsheetApp.flush();
-      Logger.log('2回目のテスト書き込みを完了しました');
+      return result;
+    } catch (error1) {
+      logToSheet('方法1による書き込み失敗', { error: error1.toString() });
 
-    } catch (writeError) {
-      result.error = {
-        message: writeError.toString(),
-        stack: writeError.stack,
-        phase: "writing"
-      };
-      Logger.log(`書き込み中にエラーが発生: ${writeError}`);
+      // 方法2: セルに直接書き込む（代替方法）
+      try {
+        const timestamp = new Date();
+        const lastRow = sheet.getLastRow() + 1;
+
+        // 各セルに個別に値を設定
+        sheet.getRange(lastRow, 1).setValue(timestamp);
+        sheet.getRange(lastRow, 2).setValue(targetURL);
+        SpreadsheetApp.flush();
+
+        logToSheet('方法2による書き込み完了', {
+          method: 'direct cell',
+          timestamp: timestamp.toISOString()
+        });
+
+        // 成功結果を記録
+        result.success = true;
+        result.message = "直接セル書き込みでアクセスが記録されました";
+
+        return result;
+      } catch (error2) {
+        logToSheet('方法2による書き込み失敗', { error: error2.toString() });
+
+        // 方法3: 最後の手段（シンプルな方法）
+        try {
+          const logSheet = spreadsheet.getSheetByName(LOG_SHEET_NAME);
+          if (logSheet) {
+            logSheet.appendRow([new Date(), "Check代替記録", targetURL]);
+            SpreadsheetApp.flush();
+
+            result.success = true;
+            result.message = "logsシートに代替記録されました";
+
+            return result;
+          }
+        } catch (error3) {
+          logToSheet('すべての書き込み方法が失敗', {
+            error1: error1.toString(),
+            error2: error2.toString(),
+            error3: error3.toString()
+          });
+
+          result.success = false;
+          result.message = "すべての記録方法が失敗しました";
+          return result;
+        }
+      }
     }
-
   } catch (error) {
-    result.error = {
-      message: error.toString(),
-      stack: error.stack,
-      phase: "setup"
-    };
-    Logger.log(`スプレッドシート操作エラー: ${error}`);
+    logToSheet('重大なエラー', { error: error.toString(), stack: error.stack });
+    result.success = false;
+    result.message = "スプレッドシートの操作中にエラーが発生しました";
+    return result;
   }
 
-  // 結果をログに記録
-  Logger.log(`記録処理結果: ${JSON.stringify(result)}`);
   return result;
 }
 

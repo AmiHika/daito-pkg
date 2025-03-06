@@ -16,84 +16,143 @@ document.addEventListener('DOMContentLoaded', function() {
     async function recordAndRedirect() {
         const targetURL = getTargetURL();
         const startTime = new Date().getTime();
+        let redirectTriggered = false;
 
+        // 複数の方法でGASにリクエストを送信（最低1つが成功すれば良い）
         try {
-            // GASにアクセス記録を送信（JSONP方式でCORS問題を回避）
-            const scriptElement = document.createElement('script');
-            const callbackName = 'gasCallback_' + Math.round(Math.random() * 1000000);
-            let redirectTriggered = false;
-
-            // コールバック関数を設定（詳細なデバッグ情報を含む）
-            window[callbackName] = function(response) {
-                console.log('GAS処理結果:', response);
-                // ブラウザコンソールに詳細なログを出力
-                console.log('リダイレクト情報:', {
-                    targetURL: targetURL,
-                    timestamp: new Date().toISOString(),
-                    responseReceived: true,
-                    responseData: response
-                });
-
-                // GASからの応答を受け取ったらリダイレクト
-                if (!redirectTriggered) {
-                    redirectTriggered = true;
-                    window.location.href = targetURL;
-                }
-
-                // コールバック関数を削除（メモリリーク防止）
-                delete window[callbackName];
-            };
-
-            // デバッグコンソールにパラメータ情報を出力
-            console.log('リクエストパラメータ:', {
+            console.log('リダイレクト処理開始:', {
                 targetURL: targetURL,
                 gasURL: gasURL
             });
 
-            // JSONP用のURLを構築（シンプルに「url」パラメータとして送信）
-            // GAS側のパラメータ名がtargetURLじゃなくてurlとして処理されている可能性があるため試してみる
-            scriptElement.src = `${gasURL}?url=${encodeURIComponent(targetURL)}&callback=${callbackName}`;
+            // 方法1: XMLHttpRequest - シンプルなGETリクエスト
+            sendXhrRequest();
 
-            // バックアップ用にimgタグでも呼び出し（GASへの到達性を高める）
-            const imgElement = document.createElement('img');
-            imgElement.width = 1;
-            imgElement.height = 1;
-            imgElement.style.display = 'none';
-            imgElement.src = `${gasURL}?url=${encodeURIComponent(targetURL)}&t=${Date.now()}`;
-            document.body.appendChild(imgElement);
+            // 方法2: Fetch API - 最新のブラウザサポート
+            sendFetchRequest();
 
-            // スクリプトのロード完了とエラー時の処理を追加
-            scriptElement.onload = function() {
-                console.log('GASスクリプトが正常に読み込まれました');
-            };
+            // 方法3: JSONP - 従来のクロスドメイン通信
+            sendJsonpRequest();
 
-            scriptElement.onerror = function() {
-                console.error('GASスクリプトの読み込みに失敗しました');
+            // 方法4: 画像ピクセル - 最もシンプルな通信
+            sendImagePixelRequest();
+
+            // 最大2秒後には強制的にリダイレクト
+            setTimeout(() => {
                 if (!redirectTriggered) {
+                    console.warn('タイムアウトによるリダイレクト実行');
                     redirectTriggered = true;
                     window.location.href = targetURL;
                 }
-            };
-
-            document.body.appendChild(scriptElement);
-
-            // 記録処理の結果を待つが、最大2000msで強制的にリダイレクト
-            const redirectWithTimeout = () => {
-                setTimeout(() => {
-                    if (!redirectTriggered) {
-                        console.warn('タイムアウトによるリダイレクト実行');
-                        redirectTriggered = true;
-                        window.location.href = targetURL;
-                    }
-                }, 2000); // 2秒に延長
-            };
-
-            // バックアップとして最大でも2秒後にはリダイレクト
-            redirectWithTimeout();
+            }, 2000);
         } catch (error) {
             console.error('記録処理中にエラーが発生しました:', error);
             // エラー発生時は即座にリダイレクト
-            window.location.href = targetURL;
+            if (!redirectTriggered) {
+                redirectTriggered = true;
+                window.location.href = targetURL;
+            }
+        }
+
+        // 方法1: XMLHttpRequestを使用
+        function sendXhrRequest() {
+            try {
+                const xhr = new XMLHttpRequest();
+                // モード指定なし（シンプルなGET）
+                xhr.open('GET', `${gasURL}?url=${encodeURIComponent(targetURL)}&method=xhr&t=${Date.now()}`, true);
+                xhr.onload = function() {
+                    console.log('XHR成功:', xhr.responseText);
+                    tryRedirect();
+                };
+                xhr.onerror = function() {
+                    console.warn('XHRエラー');
+                };
+                xhr.send();
+            } catch (e) {
+                console.warn('XHR例外:', e);
+            }
+        }
+
+        // 方法2: Fetch APIを使用
+        function sendFetchRequest() {
+            try {
+                fetch(`${gasURL}?url=${encodeURIComponent(targetURL)}&method=fetch&t=${Date.now()}`, {
+                    mode: 'no-cors' // CORSエラーを回避
+                })
+                .then(response => {
+                    console.log('Fetch成功');
+                    tryRedirect();
+                })
+                .catch(error => {
+                    console.warn('Fetchエラー:', error);
+                });
+            } catch (e) {
+                console.warn('Fetch例外:', e);
+            }
+        }
+
+        // 方法3: JSONPを使用
+        function sendJsonpRequest() {
+            try {
+                const callbackName = 'gasCallback_' + Math.round(Math.random() * 1000000);
+
+                // コールバック関数を設定
+                window[callbackName] = function(response) {
+                    console.log('JSONP成功:', response);
+                    tryRedirect();
+                    delete window[callbackName]; // メモリリーク防止
+                };
+
+                // スクリプトエレメント作成
+                const scriptElement = document.createElement('script');
+                scriptElement.src = `${gasURL}?url=${encodeURIComponent(targetURL)}&method=jsonp&callback=${callbackName}&t=${Date.now()}`;
+
+                scriptElement.onload = function() {
+                    console.log('JSONPスクリプト読み込み完了');
+                };
+
+                scriptElement.onerror = function() {
+                    console.warn('JSONPスクリプト読み込みエラー');
+                    delete window[callbackName]; // エラー時も削除
+                };
+
+                document.body.appendChild(scriptElement);
+            } catch (e) {
+                console.warn('JSONP例外:', e);
+            }
+        }
+
+        // 方法4: 画像ピクセルを使用
+        function sendImagePixelRequest() {
+            try {
+                const imgElement = document.createElement('img');
+                imgElement.width = 1;
+                imgElement.height = 1;
+                imgElement.style.display = 'none';
+                imgElement.src = `${gasURL}?url=${encodeURIComponent(targetURL)}&method=img&t=${Date.now()}`;
+
+                imgElement.onload = function() {
+                    console.log('画像ピクセル読み込み成功');
+                    tryRedirect();
+                };
+
+                imgElement.onerror = function() {
+                    console.warn('画像ピクセル読み込みエラー');
+                };
+
+                document.body.appendChild(imgElement);
+            } catch (e) {
+                console.warn('画像ピクセル例外:', e);
+            }
+        }
+
+        // 安全にリダイレクトを実行する関数
+        function tryRedirect() {
+            if (!redirectTriggered) {
+                redirectTriggered = true;
+                console.log('リダイレクト実行:', targetURL);
+                window.location.href = targetURL;
+            }
         }
     }
 
