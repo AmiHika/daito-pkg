@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Google Apps ScriptのデプロイURL（新しく再デプロイしたURLに更新済み）
     // 注意: このURLは「アクセスできるユーザー: 全員（匿名ユーザーを含む）」の設定で再デプロイする必要があります
-    const gasURL = 'https://script.google.com/https://script.google.com/macros/s/AKfycby-6j0ApUPhypSLEbCWlVNyxgvsYUXxIMo78z6p4_rK6BEKsaADABoyeS00phWT6wJbcQ/exec/s/AKfycbwfhgTm1RbDN4GJLv8TzsKII_vWmU2bjuZg06pbA0MOZ3if-SLfwVh4aXgQuc0QB4Z5/exec';
+    const gasURL = 'https://script.google.com/macros/s/AKfycbwfhgTm1RbDN4GJLv8TzsKII_vWmU2bjuZg06pbA0MOZ3if-SLfwVh4aXgQuc0QB4Z5/exec';
 
     // URLからターゲットURLを取得（カスタムURLも許可）
     function getTargetURL() {
