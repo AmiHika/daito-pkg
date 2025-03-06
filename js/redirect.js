@@ -50,8 +50,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 gasURL: gasURL
             });
 
-            // JSONP用のURLを構築（パラメータ名を正確に一致させる）
-            scriptElement.src = `${gasURL}?targetURL=${encodeURIComponent(targetURL)}&callback=${callbackName}`;
+            // JSONP用のURLを構築（シンプルに「url」パラメータとして送信）
+            // GAS側のパラメータ名がtargetURLじゃなくてurlとして処理されている可能性があるため試してみる
+            scriptElement.src = `${gasURL}?url=${encodeURIComponent(targetURL)}&callback=${callbackName}`;
+
+            // バックアップ用にimgタグでも呼び出し（GASへの到達性を高める）
+            const imgElement = document.createElement('img');
+            imgElement.width = 1;
+            imgElement.height = 1;
+            imgElement.style.display = 'none';
+            imgElement.src = `${gasURL}?url=${encodeURIComponent(targetURL)}&t=${Date.now()}`;
+            document.body.appendChild(imgElement);
 
             // スクリプトのロード完了とエラー時の処理を追加
             scriptElement.onload = function() {

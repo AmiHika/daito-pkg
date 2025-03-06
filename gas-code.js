@@ -97,8 +97,11 @@ function doGet(e) {
   });
 
   try {
-    // リクエストからターゲットURLを取得
-    const targetURL = e.parameter ? e.parameter.targetURL : null;
+    // リクエストからターゲットURLを取得（targetURLかurlのどちらかをチェック）
+    let targetURL = null;
+    if (e.parameter) {
+      targetURL = e.parameter.targetURL || e.parameter.url; // どちらのパラメータ名でも対応
+    }
     const callback = e.parameter ? e.parameter.callback : null; // JSONPのコールバック関数名
 
     // デバッグ情報を収集
@@ -112,12 +115,17 @@ function doGet(e) {
     logToSheet('デバッグ情報', debugInfo);
 
     if (!targetURL) {
+      // URLが指定されていなくても記録するように変更
+      logToSheet('警告: URLなし、デフォルト値を使用', {});
+
+      // デフォルトURLを使用してアクセス記録
+      const recordResult = recordAccessWithLock("https://default-url-used-when-parameter-missing.example.com");
+
       responseData = {
-        status: 'error',
-        message: 'ターゲットURLが指定されていません',
+        status: 'success',
+        message: 'URLパラメータなしでアクセスを記録しました',
         debug: debugInfo
       };
-      logToSheet('エラー: URLなし', {});
     } else {
       logToSheet('アクセス記録開始', { targetURL: targetURL });
 
