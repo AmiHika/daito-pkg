@@ -3,8 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- GitHub Pages対応のため、セキュリティポリシーを緩和 -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://script.google.com; img-src 'self' https://script.google.com; connect-src 'self' https://script.google.com;">
     <title>リダイレクト中...</title>
     <link rel="stylesheet" href="css/style.css">
+    <!-- デバッグコンソール -->
+    <style>
+        #debug-console {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            width: 80%;
+            max-height: 200px;
+            overflow-y: auto;
+            background: rgba(0,0,0,0.7);
+            color: #0f0;
+            font-family: monospace;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            display: none;
+            z-index: 9999;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -14,6 +35,63 @@
             <p>しばらくお待ちください</p>
         </div>
     </div>
+
+    <!-- デバッグコンソール（実際の動作確認用、開発時のみ表示） -->
+    <div id="debug-console"></div>
+
+    <!-- デバッグモード切り替えボタン -->
+    <div style="position: fixed; top: 5px; right: 5px; z-index: 9999;">
+        <button id="debug-toggle" style="background: #444; color: white; border: none; padding: 5px; font-size: 10px; cursor: pointer; opacity: 0.3;">DEBUG</button>
+    </div>
+
+    <script>
+        // デバッグ機能
+        window.appDebug = {
+            log: function(message, data) {
+                console.log(message, data); // 通常のコンソールにも出力
+
+                const console = document.getElementById('debug-console');
+                const entry = document.createElement('div');
+                const time = new Date().toLocaleTimeString();
+
+                entry.innerHTML = `<span style="color:#aaa;">[${time}]</span> ${message} ${data ? JSON.stringify(data) : ''}`;
+                console.appendChild(entry);
+                console.scrollTop = console.scrollHeight;
+            },
+
+            error: function(message, data) {
+                console.error(message, data);
+
+                const console = document.getElementById('debug-console');
+                const entry = document.createElement('div');
+                const time = new Date().toLocaleTimeString();
+
+                entry.innerHTML = `<span style="color:#f55;">[${time}] ERROR:</span> ${message} ${data ? JSON.stringify(data) : ''}`;
+                console.appendChild(entry);
+                console.scrollTop = console.scrollHeight;
+            }
+        };
+
+        // デバッグ表示切り替え
+        document.getElementById('debug-toggle').addEventListener('click', function() {
+            const console = document.getElementById('debug-console');
+            if (console.style.display === 'block') {
+                console.style.display = 'none';
+                this.style.opacity = '0.3';
+            } else {
+                console.style.display = 'block';
+                this.style.opacity = '1';
+                // 画面表示時に環境情報をログ
+                window.appDebug.log('環境情報:', {
+                    userAgent: navigator.userAgent,
+                    host: window.location.host,
+                    protocol: window.location.protocol,
+                    pathname: window.location.pathname
+                });
+            }
+        });
+    </script>
+
     <script src="js/redirect.js"></script>
 </body>
 </html>
