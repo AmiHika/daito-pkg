@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>リダイレクトテスト</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            color: #333;
+        }
+        .btn {
+            display: inline-block;
+            background: #4285f4;
+            color: white;
+            padding: 10px 20px;
+            margin: 10px 0;
+            border-radius: 5px;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .log {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-top: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        pre {
+            margin: 0;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>リダイレクトテスト</h1>
+
+    <p>以下のボタンをクリックしてリダイレクトをテストします。</p>
+
+    <button id="testDirectUrl" class="btn">直接URLでテスト</button>
+    <button id="testWithFetch" class="btn">Fetchでテスト</button>
+    <button id="testWithJsonp" class="btn">JSONPでテスト</button>
+
+    <div class="log">
+        <h3>ログ</h3>
+        <pre id="logOutput"></pre>
+    </div>
+
+    <script>
+        // ログ出力
+        function log(message) {
+            const logOutput = document.getElementById('logOutput');
+            const timestamp = new Date().toISOString();
+            logOutput.textContent += `[${timestamp}] ${message}\n`;
+        }
+
+        // Google Apps ScriptのデプロイURL
+        const gasURL = 'https://script.google.com/macros/s/AKfycbwfhgTm1RbDN4GJLv8TzsKII_vWmU2bjuZg06pbA0MOZ3if-SLfwVh4aXgQuc0QB4Z5/exec';
+
+        // テスト用のターゲットURL
+        const targetURL = 'https://example.com?test=' + Date.now();
+
+        // 直接URLでテスト
+        document.getElementById('testDirectUrl').addEventListener('click', function() {
+            log('直接URLでテスト開始...');
+            log(`ターゲットURL: ${targetURL}`);
+
+            const fullUrl = `${gasURL}?targetURL=${encodeURIComponent(targetURL)}`;
+            log(`GAS URL: ${fullUrl}`);
+
+            // 新しいタブでGAS URLを開く
+            window.open(fullUrl, '_blank');
+
+            log('新しいタブでGAS URLを開きました');
+        });
+
+        // Fetchでテスト
+        document.getElementById('testWithFetch').addEventListener('click', async function() {
+            log('Fetchでテスト開始...');
+            log(`ターゲットURL: ${targetURL}`);
+
+            try {
+                const response = await fetch(`${gasURL}?targetURL=${encodeURIComponent(targetURL)}`, {
+                    method: 'GET'
+                });
+
+                if (response.ok) {
+                    const text = await response.text();
+                    log(`レスポンス: ${text}`);
+                } else {
+                    log(`エラー: ${response.status} ${response.statusText}`);
+                }
+            } catch (error) {
+                log(`例外が発生しました: ${error.message}`);
+            }
+
+            log('Fetchテスト完了');
+        });
+
+        // JSONPでテスト
+        document.getElementById('testWithJsonp').addEventListener('click', function() {
+            log('JSONPでテスト開始...');
+            log(`ターゲットURL: ${targetURL}`);
+
+            // コールバック関数を定義
+            const callbackName = 'gasCallback_' + Math.round(Math.random() * 1000000);
+
+            window[callbackName] = function(response) {
+                log(`JSONP コールバック実行: ${JSON.stringify(response)}`);
+                delete window[callbackName]; // クリーンアップ
+            };
+
+            // script要素を作成
+            const script = document.createElement('script');
+            script.src = `${gasURL}?targetURL=${encodeURIComponent(targetURL)}&callback=${callbackName}`;
+
+            log(`JSONP URL: ${script.src}`);
+
+            // エラーハンドリング
+            script.onerror = function() {
+                log('スクリプトの読み込み中にエラーが発生しました');
+                delete window[callbackName]; // クリーンアップ
+            };
+
+            // DOMに追加
+            document.body.appendChild(script);
+
+            log('JSONPリクエストを送信しました');
+        });
+
+        // 初期ログ
+        log('テストページが読み込まれました');
+        log(`GAS URL: ${gasURL}`);
+    </script>
+</body>
+</html>
