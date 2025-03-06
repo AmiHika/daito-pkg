@@ -44,7 +44,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 delete window[callbackName];
             };
 
-            // JSONP用のURLを構築
+            // デバッグコンソールにパラメータ情報を出力
+            console.log('リクエストパラメータ:', {
+                targetURL: targetURL,
+                gasURL: gasURL
+            });
+
+            // JSONP用のURLを構築（パラメータ名を正確に一致させる）
             scriptElement.src = `${gasURL}?targetURL=${encodeURIComponent(targetURL)}&callback=${callbackName}`;
 
             // スクリプトのロード完了とエラー時の処理を追加

@@ -87,7 +87,14 @@ function doGet(e) {
     e = { parameter: {} }; // 最低限のオブジェクト構造を作成
   }
 
-  logToSheet('リクエスト受信', { params: e.parameter || {} });
+  // リクエスト全体とパラメータを詳細にログに記録
+  logToSheet('リクエスト受信', {
+    params: e.parameter || {},
+    fullRequestObj: JSON.stringify(e),
+    queryString: e.queryString,
+    contentLength: e.contentLength,
+    contentType: e.contentType
+  });
 
   try {
     // リクエストからターゲットURLを取得
